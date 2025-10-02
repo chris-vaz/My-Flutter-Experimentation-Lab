@@ -176,6 +176,210 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
     );
   }
 
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1D1E33),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.settings, color: _getModeColor()),
+            const SizedBox(width: 10),
+            const Text(
+              'Settings',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSettingSlider(
+                label: 'Focus Duration',
+                icon: Icons.psychology,
+                value: _focusDuration.toDouble(),
+                min: 5,
+                max: 60,
+                divisions: 11,
+                onChanged: (value) {
+                  setState(() {
+                    _focusDuration = value.toInt();
+                    if (_currentMode == TimerMode.focus && !_isRunning) {
+                      _remainingSeconds = _focusDuration * 60;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              _buildSettingSlider(
+                label: 'Short Break',
+                icon: Icons.coffee,
+                value: _shortBreakDuration.toDouble(),
+                min: 1,
+                max: 15,
+                divisions: 14,
+                onChanged: (value) {
+                  setState(() {
+                    _shortBreakDuration = value.toInt();
+                    if (_currentMode == TimerMode.shortBreak && !_isRunning) {
+                      _remainingSeconds = _shortBreakDuration * 60;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              _buildSettingSlider(
+                label: 'Long Break',
+                icon: Icons.hotel,
+                value: _longBreakDuration.toDouble(),
+                min: 10,
+                max: 30,
+                divisions: 4,
+                onChanged: (value) {
+                  setState(() {
+                    _longBreakDuration = value.toInt();
+                    if (_currentMode == TimerMode.longBreak && !_isRunning) {
+                      _remainingSeconds = _longBreakDuration * 60;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              _buildSettingSlider(
+                label: 'Daily Goal',
+                icon: Icons.emoji_events,
+                value: _dailyGoal.toDouble(),
+                min: 4,
+                max: 16,
+                divisions: 12,
+                onChanged: (value) {
+                  setState(() => _dailyGoal = value.toInt());
+                },
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: _getModeColor().withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _getModeColor().withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: _getModeColor(), size: 20),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Changes apply on next timer cycle',
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _focusDuration = 25;
+                _shortBreakDuration = 5;
+                _longBreakDuration = 15;
+                _dailyGoal = 8;
+                _resetTimer();
+              });
+            },
+            child: Text(
+              'Reset Defaults',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Done',
+              style: TextStyle(
+                color: _getModeColor(),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingSlider({
+    required String label,
+    required IconData icon,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: _getModeColor(), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _getModeColor().withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${value.toInt()} min',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: _getModeColor(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderThemeData(
+            activeTrackColor: _getModeColor(),
+            inactiveTrackColor: Colors.white12,
+            thumbColor: _getModeColor(),
+            overlayColor: _getModeColor().withOpacity(0.2),
+            trackHeight: 4,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
   String _formatTime(int totalSeconds) {
     final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
@@ -290,23 +494,26 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1D1E33),
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: _getModeColor().withOpacity(0.3),
-                  blurRadius: 15,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.settings_outlined,
-              color: _getModeColor(),
-              size: 28,
+          GestureDetector(
+            onTap: _showSettingsDialog,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D1E33),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: _getModeColor().withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.settings_outlined,
+                color: _getModeColor(),
+                size: 28,
+              ),
             ),
           ),
         ],
