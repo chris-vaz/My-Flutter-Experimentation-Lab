@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -42,7 +44,7 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
     with TickerProviderStateMixin {
   // Timer states
   Timer? _timer;
-  int _remainingSeconds = 25 * 60; // 25 minutes default
+  int _remainingSeconds = 25 * 60;
   bool _isRunning = false;
   
   // Pomodoro settings
@@ -118,7 +120,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
       _isRunning = false;
       if (_currentMode == TimerMode.focus) {
         _completedPomodoros++;
-        // Switch to break mode
         if (_completedPomodoros % 4 == 0) {
           _switchMode(TimerMode.longBreak);
         } else {
@@ -128,7 +129,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
         _switchMode(TimerMode.focus);
       }
     });
-    // Show completion dialog
     _showCompletionDialog();
   }
 
@@ -177,147 +177,152 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
   }
 
   void _showSettingsDialog() {
+    // Create local copies for the dialog
+    int tempFocus = _focusDuration;
+    int tempShort = _shortBreakDuration;
+    int tempLong = _longBreakDuration;
+    int tempGoal = _dailyGoal;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1E33),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.settings, color: _getModeColor()),
-            const SizedBox(width: 10),
-            const Text(
-              'Settings',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSettingSlider(
-                label: 'Focus Duration',
-                icon: Icons.psychology,
-                value: _focusDuration.toDouble(),
-                min: 5,
-                max: 60,
-                divisions: 11,
-                onChanged: (value) {
-                  setState(() {
-                    _focusDuration = value.toInt();
-                    if (_currentMode == TimerMode.focus && !_isRunning) {
-                      _remainingSeconds = _focusDuration * 60;
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildSettingSlider(
-                label: 'Short Break',
-                icon: Icons.coffee,
-                value: _shortBreakDuration.toDouble(),
-                min: 1,
-                max: 15,
-                divisions: 14,
-                onChanged: (value) {
-                  setState(() {
-                    _shortBreakDuration = value.toInt();
-                    if (_currentMode == TimerMode.shortBreak && !_isRunning) {
-                      _remainingSeconds = _shortBreakDuration * 60;
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildSettingSlider(
-                label: 'Long Break',
-                icon: Icons.hotel,
-                value: _longBreakDuration.toDouble(),
-                min: 10,
-                max: 30,
-                divisions: 4,
-                onChanged: (value) {
-                  setState(() {
-                    _longBreakDuration = value.toInt();
-                    if (_currentMode == TimerMode.longBreak && !_isRunning) {
-                      _remainingSeconds = _longBreakDuration * 60;
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildSettingSlider(
-                label: 'Daily Goal',
-                icon: Icons.emoji_events,
-                value: _dailyGoal.toDouble(),
-                min: 4,
-                max: 16,
-                divisions: 12,
-                onChanged: (value) {
-                  setState(() => _dailyGoal = value.toInt());
-                },
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: _getModeColor().withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _getModeColor().withOpacity(0.3),
-                  ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1D1E33),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(Icons.settings, color: _getModeColor()),
+                const SizedBox(width: 10),
+                const Text(
+                  'Settings',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: _getModeColor(), size: 20),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Changes apply on next timer cycle',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSettingSliderInDialog(
+                    label: 'Focus Duration',
+                    icon: Icons.psychology,
+                    value: tempFocus.toDouble(),
+                    min: 5,
+                    max: 60,
+                    divisions: 11,
+                    onChanged: (value) {
+                      setDialogState(() => tempFocus = value.toInt());
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSettingSliderInDialog(
+                    label: 'Short Break',
+                    icon: Icons.coffee,
+                    value: tempShort.toDouble(),
+                    min: 1,
+                    max: 15,
+                    divisions: 14,
+                    onChanged: (value) {
+                      setDialogState(() => tempShort = value.toInt());
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSettingSliderInDialog(
+                    label: 'Long Break',
+                    icon: Icons.hotel,
+                    value: tempLong.toDouble(),
+                    min: 10,
+                    max: 30,
+                    divisions: 4,
+                    onChanged: (value) {
+                      setDialogState(() => tempLong = value.toInt());
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSettingSliderInDialog(
+                    label: 'Daily Goal',
+                    icon: Icons.emoji_events,
+                    value: tempGoal.toDouble(),
+                    min: 4,
+                    max: 16,
+                    divisions: 12,
+                    onChanged: (value) {
+                      setDialogState(() => tempGoal = value.toInt());
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: _getModeColor().withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _getModeColor().withOpacity(0.3),
                       ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: _getModeColor(), size: 20),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Changes apply immediately',
+                            style: TextStyle(fontSize: 12, color: Colors.white70),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    tempFocus = 25;
+                    tempShort = 5;
+                    tempLong = 15;
+                    tempGoal = 8;
+                  });
+                },
+                child: const Text(
+                  'Reset Defaults',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _focusDuration = tempFocus;
+                    _shortBreakDuration = tempShort;
+                    _longBreakDuration = tempLong;
+                    _dailyGoal = tempGoal;
+                    if (!_isRunning) {
+                      _remainingSeconds = _getDurationForMode(_currentMode) * 60;
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'Done',
+                  style: TextStyle(
+                    color: _getModeColor(),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _focusDuration = 25;
-                _shortBreakDuration = 5;
-                _longBreakDuration = 15;
-                _dailyGoal = 8;
-                _resetTimer();
-              });
-            },
-            child: Text(
-              'Reset Defaults',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Done',
-              style: TextStyle(
-                color: _getModeColor(),
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSettingSlider({
+  Widget _buildSettingSliderInDialog({
     required String label,
     required IconData icon,
     required double value,
@@ -494,27 +499,61 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
               ),
             ],
           ),
-          GestureDetector(
-            onTap: _showSettingsDialog,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1D1E33),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: _getModeColor().withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 1,
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const QuotesPage(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D1E33),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getModeColor().withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
-                ],
+                  child: Icon(
+                    Icons.format_quote,
+                    color: _getModeColor(),
+                    size: 28,
+                  ),
+                ),
               ),
-              child: Icon(
-                Icons.settings_outlined,
-                color: _getModeColor(),
-                size: 28,
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _showSettingsDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D1E33),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getModeColor().withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.settings_outlined,
+                    color: _getModeColor(),
+                    size: 28,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -607,7 +646,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Background circle
                 CustomPaint(
                   size: const Size(280, 280),
                   painter: CircularProgressPainter(
@@ -616,7 +654,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
                     backgroundColor: const Color(0xFF1D1E33),
                   ),
                 ),
-                // Center content
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -842,6 +879,366 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage>
           ),
         ],
       ),
+    );
+  }
+}
+
+// ============================================
+// NEW PAGE: Quotes Page with FutureBuilder
+// ============================================
+
+class QuotesPage extends StatefulWidget {
+  const QuotesPage({super.key});
+
+  @override
+  State<QuotesPage> createState() => _QuotesPageState();
+}
+
+class _QuotesPageState extends State<QuotesPage> {
+  late Future<List<Quote>> _quotesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _quotesFuture = fetchQuotes();
+  }
+
+  // API call to fetch quotes
+  Future<List<Quote>> fetchQuotes() async {
+    // Using ZenQuotes API - free and no authentication required
+    final response = await http.get(
+      Uri.parse('https://zenquotes.io/api/quotes'),
+    );
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Quote.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load quotes');
+    }
+  }
+
+  void _refreshQuotes() {
+    setState(() {
+      _quotesFuture = fetchQuotes();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0A0E21),
+              Color(0xFF1D1E33),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildQuotesHeader(),
+              Expanded(
+                child: FutureBuilder<List<Quote>>(
+                  future: _quotesFuture,
+                  builder: (context, snapshot) {
+                    // Loading state
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            CircularProgressIndicator(
+                              color: Color(0xFFFF6B9D),
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              'Loading inspiring quotes...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    
+                    // Error state
+                    else if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 80,
+                              color: Color(0xFFFF6B9D),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Error: ${snapshot.error}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+                            ElevatedButton.icon(
+                              onPressed: _refreshQuotes,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Try Again'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6B9D),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 30,
+                                  vertical: 15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    
+                    // Success state with data
+                    else if (snapshot.hasData) {
+                      final quotes = snapshot.data!;
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          _refreshQuotes();
+                        },
+                        color: const Color(0xFFFF6B9D),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: quotes.length,
+                          itemBuilder: (context, index) {
+                            return _buildQuoteCard(quotes[index], index);
+                          },
+                        ),
+                      );
+                    }
+                    
+                    // Empty state (no data)
+                    else {
+                      return const Center(
+                        child: Text(
+                          'No quotes available',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuotesHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D1E33),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF6B9D).withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFFFF6B9D),
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Daily Inspiration',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    foreground: Paint()
+                      ..shader = const LinearGradient(
+                        colors: [Color(0xFFFF6B9D), Color(0xFFC86DD7)],
+                      ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Stay motivated during your breaks',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white54,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: _refreshQuotes,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D1E33),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF6B9D).withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.refresh,
+                color: Color(0xFFFF6B9D),
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuoteCard(Quote quote, int index) {
+    final gradients = [
+      [const Color(0xFFFF6B9D), const Color(0xFFFF8FAB)],
+      [const Color(0xFF4ECDC4), const Color(0xFF6FE7DD)],
+      [const Color(0xFFC86DD7), const Color(0xFFD88FE5)],
+      [const Color(0xFFFFD93D), const Color(0xFFFFE066)],
+    ];
+    
+    final gradient = gradients[index % gradients.length];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            gradient[0].withOpacity(0.1),
+            gradient[1].withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: gradient[0].withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradient,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.format_quote,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Quote #${index + 1}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: gradient[0],
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            quote.text,
+            style: const TextStyle(
+              fontSize: 18,
+              height: 1.5,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              Container(
+                height: 2,
+                width: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: gradient),
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '- ${quote.author}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontStyle: FontStyle.italic,
+                    color: gradient[0],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Quote model class
+class Quote {
+  final String text;
+  final String author;
+
+  Quote({required this.text, required this.author});
+
+  factory Quote.fromJson(Map<String, dynamic> json) {
+    return Quote(
+      text: json['q'] ?? '',
+      author: json['a'] ?? 'Unknown',
     );
   }
 }
