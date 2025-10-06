@@ -18,6 +18,15 @@ This sandbox is focused on achieving the following learning objectives:
 
 ---
 
+## 🧩 Features Implemented So Far
+
+As part of my learning journey, I’ve already built:
+
+- ⏱ **Pomodoro Timer** – A customizable timer with adjustable settings for focused work and short breaks.  
+- 💬 **Motivational Quotes Page** – Uses the free [ZenQuotes API](https://zenquotes.io) with `FutureBuilder` to fetch and display inspirational quotes, complete with pull-to-refresh and error handling.
+
+---
+
 ## 🛠️ Tech Stack & Prerequisites
 
 ### Technologies Used
@@ -40,7 +49,7 @@ To clone and run this project locally, ensure you have the following installed:
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/YourUsername/flutter-learning-sandbox.git](https://github.com/YourUsername/flutter-learning-sandbox.git)
+    git clone https://github.com/YourUsername/flutter-learning-sandbox.git
     cd flutter-learning-sandbox
     ```
 2.  **Get dependencies:**
@@ -67,7 +76,6 @@ The code is organized primarily in the `lib` directory, with features often sepa
 | `lib/core/` | Global themes, constants, and utilities. |
 | `assets/` | Fonts, images, and other resources. |
 | `test/` | Unit tests and widget tests. |
-
 
 ---
 
